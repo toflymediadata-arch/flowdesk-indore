@@ -206,6 +206,26 @@ server.listen(PORT, () => {
   console.log(`🤖 AI Assistant: ${process.env.GROQ_API_KEY ? 'enabled' : 'GROQ_API_KEY not set — AI disabled'}`);
   console.log(`🌐 CORS allowed origins: ${allowedOrigins.join(', ')}`);
 
+  // ── Keep-alive: stop Render's free plan from idling the service ───────────
+  // Render sleeps a free service after ~15 min with no INBOUND requests. We hit
+  // our own PUBLIC url (so it counts as inbound traffic) every 10 minutes, 24/7.
+  // RENDER_EXTERNAL_URL is set automatically by Render; BACKEND_URL is an optional
+  // override. Only runs in production, so local dev is unaffected.
+  const keepAliveBase = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL;
+  if (keepAliveBase && process.env.NODE_ENV === 'production') {
+    const keepAliveTarget = `${keepAliveBase.replace(/\/+$/, '')}/api/health`;
+    const keepAliveClient = keepAliveTarget.startsWith('https')
+      ? require('https')
+      : require('http');
+    const keepAlivePing = () => {
+      const req = keepAliveClient.get(keepAliveTarget, (res) => res.resume());
+      req.on('error', (err) => console.warn(`[KEEPALIVE] ping failed: ${err.message}`));
+      req.setTimeout(15000, () => req.destroy());
+    };
+    setInterval(keepAlivePing, 10 * 60 * 1000);
+    console.log(`💓 Keep-alive enabled → ${keepAliveTarget} every 10 min`);
+  }
+
   // ── Deadline auto-move: 'today' tasks past their deadline → 'pending' ──────
   const Task = require('./models/Task');
   const runDeadlineCheck = async () => {
