@@ -90,6 +90,7 @@ app.use(cors({
     process.env.CLIENT_URL,
     'http://localhost:5173',
     'http://localhost:3000',
+    'https://indoreflowdesk.toflymediaa.com/'
     // Optional extra allowed origins (comma-separated), e.g. a staging front-end.
     ...(process.env.CORS_EXTRA_ORIGINS || '').split(',').map((o) => o.trim()),
   ].filter(Boolean),
