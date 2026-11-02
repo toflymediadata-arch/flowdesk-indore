@@ -83,24 +83,32 @@ connections.connectAll({
 // Security Middleware
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
-// CORS
-app.use(cors({
-  origin: [
-    'https://indoreflowdesk.toflymediaa.com/',
-    process.env.CLIENT_URL,
-    'http://localhost:5173',
-    'http://localhost:3000',
-    
-    // Optional extra allowed origins (comma-separated), e.g. a staging front-end.
-    ...(process.env.CORS_EXTRA_ORIGINS || '').split(',').map((o) => o.trim()),
-  ].filter(Boolean),
+// ── CORS ──────────────────────────────────────────────────────────────────────
+// Allowed browser origins for THIS (Indore) deployment.
+//   CLIENT_URL          one or more frontend URLs, comma-separated
+//   CORS_EXTRA_ORIGINS  any additional origins, comma-separated
+// Entries are trimmed and trailing slashes removed, because the browser's
+// Origin header never contains a trailing slash (an exact match is required).
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  ...(process.env.CLIENT_URL || '').split(','),
+  ...(process.env.CORS_EXTRA_ORIGINS || '').split(','),
+]
+  .map((o) => o.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+
+const corsOptions = {
+  origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+};
 
-// Handle preflight for all routes
-app.options('*', cors());
+app.use(cors(corsOptions));
+
+// Handle preflight for all routes (with the same restrictions as above)
+app.options('*', cors(corsOptions));
 
 // Body Parser
 app.use(express.json({ limit: '10mb' }));
@@ -196,6 +204,7 @@ server.listen(PORT, () => {
   console.log(`🚀 FlowDesk Server running on port ${PORT}`);
   console.log(`📡 Environment: ${process.env.NODE_ENV}`);
   console.log(`🤖 AI Assistant: ${process.env.GROQ_API_KEY ? 'enabled' : 'GROQ_API_KEY not set — AI disabled'}`);
+  console.log(`🌐 CORS allowed origins: ${allowedOrigins.join(', ')}`);
 
   // ── Deadline auto-move: 'today' tasks past their deadline → 'pending' ──────
   const Task = require('./models/Task');
